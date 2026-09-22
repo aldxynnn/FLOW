@@ -1,0 +1,30 @@
+# Android / Gradle
+.gradle/
+**/build/
+local.properties
+
+# IntelliJ / Android Studio
+.idea/
+*.iml
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Node
+node_modules/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Backend
+target/
+
+# Temporary
+tmp/
+temp/
