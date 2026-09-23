@@ -1,0 +1,43 @@
+name: FLOW CI
+
+on:
+  push:
+    branches: ["main", "master"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend/flow-backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+      - name: Test
+        run: ./gradlew test --no-daemon
+
+  android:
+    name: Android debug build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+      - uses: android-actions/setup-android@v3
+      - name: Build debug APK
+        run: ./gradlew assembleDebug --no-daemon

@@ -1,0 +1,17 @@
+.idea/
+.vscode/
+.gradle/
+**/.gradle/
+**/build/
+**/.gradle-wrapper/
+*.iml
+local.properties
+**/local.properties
+.DS_Store
+Thumbs.db
+.env
+*.log
+*.apk
+*.aab
+
+**/.gradle-wrapper/
