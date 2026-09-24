@@ -1,0 +1,4 @@
+# Copy this file to gradle.properties if you want a custom API URL.
+# Emulator default is http://10.0.2.2:8080/api/
+# Example physical device / deployed API:
+# FLOW_API_BASE_URL=https://api.example.com/api/
