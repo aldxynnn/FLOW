@@ -129,6 +129,8 @@ fun TripMapCard(
                         OpenMapView(viewContext).apply {
                             lifecycleOwner.lifecycle.addObserver(this)
 
+                            // FLOW light map:
+                            // cleaner and less visually dense than STANDARD.
                             setMapType(MapType.STANDARD)
 
                             getUiSettings().apply {
