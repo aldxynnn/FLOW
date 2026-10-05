@@ -1,84 +1,63 @@
 # FLOW — Run First
 
-FLOW is intentionally **data-driven**. A fresh installation does not create demo users, vehicles or trips automatically.
+FLOW is intentionally **data-driven**. A fresh installation does not create demo vehicles or trips automatically.
 
-## 1. Start PostgreSQL
+## Fastest local setup on Windows
 
-Use your existing PostgreSQL installation or Docker. Create database `flow`.
+Prerequisites:
+- Docker Desktop
+- Android Studio with the Android SDK
+- Java 21
+- Python 3
 
-## 2. Create the first administrator
-
-Set these environment variables before starting the backend:
-
-```powershell
-$env:FLOW_BOOTSTRAP_ADMIN_USERNAME="your-admin"
-$env:FLOW_BOOTSTRAP_ADMIN_PASSWORD="your-strong-password"
-```
-
-The bootstrap account is created only when that username does not exist. It is not sample data.
-
-## 3. Start the backend
+After cloning the repository, run:
 
 ```powershell
-cd FLOW-FINAL-RELEASE\backend\flow-backend
-.\gradlew.bat bootRun
+.\scripts\dev.bat
 ```
 
-Verify:
+That launcher automatically:
+- starts PostgreSQL for FLOW on port `5433` so it does not require port `5432`
+- configures the local backend connection
+- configures a local development JWT secret
+- creates the first `admin` account on a fresh database
+- starts the backend on `http://localhost:8080`
+- starts the web console on `http://localhost:5500`
+
+Local development login:
 
 ```text
-http://localhost:8080/api/health
+Username: admin
+Password: TestPassword-ChangeMe-123!
 ```
 
-Serve the operations console separately:
+The password above is **development-only**. Change it for any non-local environment.
 
-```powershell
-cd FLOW-FINAL-RELEASE/web
-python -m http.server 5500
-```
+## Android
 
-Then open:
+Open the `android/` directory in Android Studio and run the `app` configuration on an API 37 emulator.
 
-```text
-http://localhost:5500/
-```
-
-## 4. Create real operational data
-
-Sign in as the administrator and create the people who will actually use the system:
-
-1. Create Fleet Manager, Dispatcher and Driver accounts.
-2. Create fleet vehicles from the backend/API or your operational management flow.
-3. Sign in as Fleet Manager and create a trip using an enabled driver and available vehicle.
-4. Dispatcher can review/reassign the trip.
-5. Driver receives the assignment in Android, starts it, transmits GPS, and completes it.
-
-## 5. Android emulator
-
-Open `FLOW-FINAL-RELEASE/android` in Android Studio and run the `app` configuration on an API 37 emulator.
-
-The development API URL is:
+The Android emulator uses:
 
 ```text
 http://10.0.2.2:8080/api/
 ```
 
-Allow the local-network permission when Android requests it.
+The backend must be running first. After `scripts\dev.bat` reports `FLOW READY`, Android can be launched normally.
 
-## 6. Production
+## Manual backend startup
 
-Use `SPRING_PROFILES_ACTIVE=prod`, HTTPS, PostgreSQL, Flyway migrations and a strong externally supplied `JWT_SECRET`. Demo seeding is disabled.
+If you do not want to use the launcher, the backend can still be started directly from `backend/flow-backend`, but the required database and authentication environment variables must be configured first.
 
-## 7. Deterministic GPS map test
+## Production
+
+Use `SPRING_PROFILES_ACTIVE=prod`, HTTPS, PostgreSQL, Flyway migrations and a strong externally supplied `JWT_SECRET`. Do not reuse the local development credentials.
+
+## Deterministic GPS map test
 
 Android debug builds expose a small `DEBUG GPS` panel inside an `IN_PROGRESS` driver trip. It sends test points through the same `/api/trips/{id}/location` endpoint used by the real foreground location service.
 
-Use the preset buttons to verify the complete pipeline without depending on the emulator's mock-location provider:
-
-`Android debug panel -> REST GPS endpoint -> PostgreSQL history -> WebSocket -> Android/Web maps`
-
 The panel is compiled behind `BuildConfig.DEBUG` and is not shown in release builds.
-
 
 ## OpenStreetMap + MapLibre maps
 
