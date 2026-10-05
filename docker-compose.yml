@@ -1,14 +1,13 @@
 services:
   postgres:
     image: postgres:18
-    container_name: flow-postgres
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-flow}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
     ports:
-      - "5432:5432"
+      - "${FLOW_POSTGRES_PORT:-5433}:5432"
     volumes:
       - flow_pgdata:/var/lib/postgresql
 
