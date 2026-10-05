@@ -1,0 +1,53 @@
+# Gradle
+.gradle/
+**/.gradle/
+**/.gradle-wrapper/
+build/
+**/build/
+
+# Android
+local.properties
+captures/
+
+# IDE
+.idea/
+*.iml
+
+# Kotlin / Java
+*.class
+.kotlin/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs / temporary files
+*.log
+*.tmp
+*.bak
+*.swp
+*.orig
+
+# Environment / secrets
+.env
+.env.*
+**/.env
+**/.env.*
+!.env.example
+!**/.env.example
+
+# Signing keys / certificates
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.pem
+*.key
+*.mobileprovision
+
+# Build / release artifacts
+*.apk
+*.aab
+
+# Archives / local packages
+*.zip

@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@6.11.2/dist/maplibre-gl.css" />
+  <style>
+    html, body, #map { width:100%; height:100%; margin:0; padding:0; }
+    body { overflow:hidden; background:#f3f6f4; }
+    .maplibregl-ctrl-group { box-shadow:0 2px 12px rgba(17,47,37,.12); border:1px solid #d7e1dc; border-radius:12px; overflow:hidden; }
+    .maplibregl-ctrl button { width:36px; height:36px; }
+    .maplibregl-ctrl-attrib { font-size:10px; }
+    .vehicle-marker { position:relative; width:20px; height:20px; border-radius:999px; background:#0b7a55; border:4px solid #fff; box-shadow:0 0 0 7px rgba(11,122,85,.16), 0 5px 14px rgba(17,47,37,.24); box-sizing:border-box; }
+    .vehicle-marker::after { content:""; position:absolute; inset:-7px; border:2px solid rgba(11,122,85,.35); border-radius:999px; animation:pulse 1.8s ease-out infinite; }
+    .recenter-control { display:flex; align-items:center; justify-content:center; width:36px; height:36px; padding:0; border:0; background:#fff; color:#0b7a55; cursor:pointer; }
+    .recenter-control svg { width:17px; height:17px; }
+    .recenter-control.is-following { background:#e9f5ef; }
+    @keyframes pulse { 0%{transform:scale(.7);opacity:.9} 70%,100%{transform:scale(1.35);opacity:0} }
+  </style>
+</head>
+<body>
+<div id="map"></div>
+<script type="module">
+  import * as maplibregl from 'https://unpkg.com/maplibre-gl@6.11.2/dist/maplibre-gl.mjs';
+
+  const STYLE_URL = 'https://vector.openstreetmap.org/styles/shortbread/graybeard.json';
+  const DEFAULT_CENTER = [106.8456, -6.2088];
+
+  const map = new maplibregl.Map({
+    container: 'map',
+    style: STYLE_URL,
+    center: DEFAULT_CENTER,
+    zoom: 12,
+    attributionControl: true,
+    dragRotate: false,
+    pitchWithRotate: false,
+    maxPitch: 0
+  });
+
+  map.addControl(new maplibregl.NavigationControl({showCompass:false}), 'bottom-right');
+
+  const RecenterControl = class {
+    onAdd(mapInstance) {
+      this.map = mapInstance;
+      this.container = document.createElement('div');
+      this.container.className = 'maplibregl-ctrl maplibregl-ctrl-group';
+      this.button = document.createElement('button');
+      this.button.className = 'recenter-control is-following';
+      this.button.type = 'button';
+      this.button.title = 'Center vehicle';
+      this.button.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v4M12 18v4M2 12h4M18 12h4"></path></svg>';
+      this.button.addEventListener('click', () => {
+        autoFollow = true;
+        setFollowState();
+        centerOnCurrent(true);
+      });
+      this.container.appendChild(this.button);
+      return this.container;
+    }
+    onRemove() { this.container.remove(); this.map = undefined; }
+  };
+
+  map.addControl(new RecenterControl(), 'bottom-right');
+
+  let autoFollow = true;
+  let marker = null;
+  let pending = null;
+  let lastPoint = null;
+  let currentPoint = null;
+  let fitted = false;
+
+  map.on('dragstart', () => {
+    autoFollow = false;
+    setFollowState();
+  });
+
+  function setFollowState() {
+    const button = document.querySelector('.recenter-control');
+    if (button) button.classList.toggle('is-following', autoFollow);
+  }
+
+  function sortPoints(points) {
+    return [...points].sort((a,b) => {
+      const ta = a?.recordedAt ? new Date(a.recordedAt).getTime() : 0;
+      const tb = b?.recordedAt ? new Date(b.recordedAt).getTime() : 0;
+      return ta - tb;
+    });
+  }
+
+  function validPoint(point) {
+    return point && Number.isFinite(Number(point.latitude)) && Number.isFinite(Number(point.longitude))
+      && Number(point.latitude) >= -90 && Number(point.latitude) <= 90
+      && Number(point.longitude) >= -180 && Number(point.longitude) <= 180;
+  }
+
+  const pointFeature = (point) => ({
+    type: 'Feature',
+    geometry: {type:'Point', coordinates:[Number(point.longitude),Number(point.latitude)]},
+    properties: {}
+  });
+
+  function routeFeature(points) {
+    return {
+      type:'Feature',
+      geometry:{type:'LineString', coordinates:points.map(p=>[Number(p.longitude),Number(p.latitude)])},
+      properties:{}
+    };
+  }
+
+  function centerOnCurrent(animate) {
+    if (!map || !currentPoint) return;
+    const center = [Number(currentPoint.longitude), Number(currentPoint.latitude)];
+    if (animate) {
+      map.easeTo({center, zoom: Math.max(map.getZoom(), 14), duration: 500, essential:true});
+    } else {
+      map.jumpTo({center, zoom: Math.max(map.getZoom(), 14)});
+    }
+  }
+
+  function applyData(payload) {
+    pending = payload || {};
+    if (!map.isStyleLoaded()) return;
+
+    const points = sortPoints(Array.isArray(pending.points) ? pending.points.filter(validPoint) : []);
+    const source = map.getSource('flow-route');
+    if (source) source.setData(points.length >= 2 ? routeFeature(points) : {type:'FeatureCollection',features:[]});
+
+    currentPoint = points.length ? points[points.length-1] : (validPoint(pending.center) ? pending.center : null);
+
+    if (currentPoint) {
+      const position = [Number(currentPoint.longitude), Number(currentPoint.latitude)];
+      if (!marker) {
+        marker = new maplibregl.Marker({element:(() => { const node=document.createElement('div'); node.className='vehicle-marker'; return node; })(), anchor:'center'})
+          .setLngLat(position)
+          .addTo(map);
+      } else {
+        marker.setLngLat(position);
+      }
+    } else if (marker) {
+      marker.remove(); marker=null;
+    }
+
+    if (!fitted && points.length > 1) {
+      const bounds = new maplibregl.LngLatBounds();
+      points.forEach(p=>bounds.extend([Number(p.longitude),Number(p.latitude)]));
+      map.fitBounds(bounds,{padding:42,maxZoom:15,duration:0});
+      fitted = true;
+    } else if (!fitted && currentPoint) {
+      centerOnCurrent(false);
+      fitted = true;
+    } else if (currentPoint && lastPoint && autoFollow) {
+      const moved = Math.abs(Number(currentPoint.latitude)-Number(lastPoint.latitude)) > 0.00005
+        || Math.abs(Number(currentPoint.longitude)-Number(lastPoint.longitude)) > 0.00005;
+      const view = map.getBounds();
+      const ll = new maplibregl.LngLat(Number(currentPoint.longitude), Number(currentPoint.latitude));
+      if (moved && (!view || !view.contains(ll))) centerOnCurrent(true);
+      else if (moved) map.easeTo({center:[Number(currentPoint.longitude),Number(currentPoint.latitude)],duration:350,essential:true});
+    }
+
+    lastPoint = currentPoint ? {...currentPoint} : null;
+  }
+
+  map.on('load', () => {
+    map.addSource('flow-route',{type:'geojson',data:{type:'FeatureCollection',features:[]}});
+    map.addLayer({
+      id:'flow-route-glow', type:'line', source:'flow-route',
+      layout:{'line-cap':'round','line-join':'round'},
+      paint:{'line-color':'#0b7a55','line-opacity':0.14,'line-width':10}
+    });
+    map.addLayer({
+      id:'flow-route', type:'line', source:'flow-route',
+      layout:{'line-cap':'round','line-join':'round'},
+      paint:{'line-color':'#0b7a55','line-opacity':0.94,'line-width':4}
+    });
+    setFollowState();
+    if (pending) applyData(pending);
+  });
+
+  window.updateFlowMap = applyData;
+</script>
+</body>
+</html>
